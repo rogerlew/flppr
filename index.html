@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Game Title</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+        .logo-banner {
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+        .start-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.2em;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .start-button:hover {
+            background-color: #45a049;
+        }
+    </style> 
+	<link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+</head>
+	<body class="bg-dark text-white">
+		<div class="container text-center py-5">
+			<div class="row justify-content-center">
+				<div class="col-12">
+					<div class="d-flex justify-content-center">
+						<img src="logo.png" alt="Game Logo" class="img-fluid" />
+					</div>
+				</div>
+
+				<div class="col-lg-8 col-md-10">
+					<div id="game-info" class="my-4">
+						<h2>About flppr</h2>
+						<p>
+							<strong>flppr</strong> is a simple but fast-paced game that challenges players to match patterns and think strategically. It's not just a test of reflexes, but also a puzzle that requires smart thinking and quick decision-making.
+						</p>
+
+						<h3>How to Play</h3>
+						<ol class="text-left">
+							<li>Start the game and observe the <strong>Current State</strong> and the <strong>Target State</strong>.</li>
+							<li>Use the <strong>A, S, D, F</strong> keys to set your bit-flipping mask.</li>
+							<li>Press <strong>Spacebar</strong> to apply the mask to the Current State.</li>
+							<li>Your goal is to make the Current State match the Target State.</li>
+							<li>Accomplish this before the timer runs out to score points and advance to the next round.</li>
+							<li>Keep an eye on the game timer! Quick thinking and fast actions will lead to higher scores.</li>
+						</ol>
+
+						<p>Are you ready to take on the challenge of Flppr and emerge as a hacking legend? Click 'Start Game' and dive into the digital puzzle!</p>
+					</div>
+
+					<a href="flppr.html" class="btn btn-primary btn-lg">Start Game</a>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

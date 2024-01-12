@@ -2,7 +2,7 @@
 let currentState = [false, false, false, false];
 let targetState = [false, false, false, false];
 let commandMask = [false, false, false, false];
-let name = 'participant0'
+let pid = "participant0";
 let score = 0;
 
 let gameUUID = generateUUID();
@@ -13,8 +13,6 @@ let worker = new Worker('timerWorker.js');
 worker.addEventListener('message', function(e) {
     const data = e.data;
 	
-	console.log(data);
-
     if (data.type === 'update') {
         document.getElementById('timer').innerText = 'Trial Time Remaining: ' + data.remainingTrialTime;
         document.getElementById('game_timer').innerText = 'Time Remaining: ' + formatTime(data.remainingGameTime);
@@ -32,9 +30,7 @@ function generateUUID() {
 // Initialize the game
 function initGame(playerName, intervalTime, gameTime) {
 	
-	console.log("in init");
-	
-    name = playerName;
+    pid = playerName;
     time_interval = intervalTime;
     game_timer = gameTime;
     timer = time_interval;
@@ -153,10 +149,8 @@ document.getElementById('game-settings-form').addEventListener('submit', functio
     const gameTime = parseInt(document.getElementById('game-time').value, 10);
 
     initGame(playerName, intervalTime, gameTime);
-	console.log("in loader");     
 	const loadingScreen = document.getElementById('loading-screen');
 	if (loadingScreen) {
-		console.log("remove");     
 		loadingScreen.parentNode.removeChild(loadingScreen);
 	}
 });
