@@ -1,8 +1,44 @@
+import { logKeyPress, 
+    logScoreUpdate, 
+    logTrialReset, 
+    logGameStart, 
+    logGameStop, 
+    logExecute,
+    addHighScore } from './firestore_db.js';
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyBGh3iTmoiYh2jhbYyyg9G9z_3DpNqidQw",
+    authDomain: "flppr-a270b.firebaseapp.com",
+    projectId: "flppr-a270b",
+    storageBucket: "flppr-a270b.appspot.com",
+    messagingSenderId: "203747411489",
+    appId: "1:203747411489:web:4991fd457ee707e0a1c560"
+    };
+
+// Initialize Firebase
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+auth.signInAnonymously()
+  .then(() => {
+    console.log("Signed in anonymously");
+  })
+  .catch((error) => {
+    const errorCode = error.code;
+    const errorMessage = error.message;
+    console.log("Error signing in anonymously:", errorCode, errorMessage);
+  });
 
 let currentState = [false, false, false, false];
 let targetState = [false, false, false, false];
 let commandMask = [false, false, false, false];
-let pid = "participant0";
+let player_id = "participant0";
+let time_interval = -1;
+let game_interval = -1
+
+let k = 0; // trial counter
 let score = 0;
 
 let gameUUID = generateUUID();
@@ -16,7 +52,15 @@ worker.addEventListener('message', function(e) {
     if (data.type === 'update') {
         document.getElementById('timer').innerText = 'Trial Time Remaining: ' + data.remainingTrialTime;
         document.getElementById('game_timer').innerText = 'Time Remaining: ' + formatTime(data.remainingGameTime);
-    } else if (data.type === 'end') {
+    } 
+    else if (data.type == 'trialTimeOut') {
+        targetState = randomState();
+        updateDisplay(targetState, 'target-state');
+
+        score--;
+	    logScoreUpdate(db, gameUUID, k, score);
+    } 
+    else if (data.type === 'end') {
         exitGame();
     }
 });
@@ -28,12 +72,10 @@ function generateUUID() {
 }
 
 // Initialize the game
-function initGame(playerName, intervalTime, gameTime) {
-	
-    pid = playerName;
-    time_interval = intervalTime;
-    game_timer = gameTime;
-    timer = time_interval;
+function initGame(playerName, new_time_interval, new_game_interval) {
+	player_id = playerName;
+    time_interval = new_time_interval; 
+    game_interval = new_game_interval;
 	
     targetState = randomState();
     updateDisplay(currentState, 'current-state');
@@ -43,8 +85,11 @@ function initGame(playerName, intervalTime, gameTime) {
     worker.postMessage({ 
         command: 'start', 
         time_interval: time_interval, 
-        game_timer: game_timer 
+        game_interval: game_interval 
     });
+
+    logGameStart(db, gameUUID, player_id, time_interval, game_interval);
+
 }
 
 // Function to generate a random boolean array
@@ -60,18 +105,9 @@ function randomState() {
         state = _randomState();
     }
 
+    k += 1;
+    logTrialReset(db, gameUUID, k, currentState, targetState)
     return state;
-}
-
-// Function to update the display of a state
-function updateDisplay(state, elementId) {
-    const element = document.getElementById(elementId);
-    element.innerHTML = '';
-    state.forEach(bit => {
-        const bitElement = document.createElement('span');
-        bitElement.className = 'bit' + (bit ? ' on' : '');
-        element.appendChild(bitElement);
-    });
 }
 
 // Function to update the command mask
@@ -87,18 +123,36 @@ function applyCommand() {
     updateDisplay(currentState, 'current-state');
 	
     if (currentState.every((bit, index) => bit === targetState[index])) {
+        
         score++;
-        document.getElementById('score').innerText = 'Score: ' + score;
+        logExecute(db, gameUUID, k, currentState, targetState, 1);
+
         targetState = randomState();
         updateDisplay(targetState, 'target-state');
 		worker.postMessage({ command: 'new_trial' });
     } else {
         score--;
+        logExecute(db, gameUUID, k, currentState, targetState, 0);
 	}
+
+    document.getElementById('score').innerText = 'Score: ' + score;
+    
+    logScoreUpdate(db, gameUUID, k, score);
 	
 	commandMask = [false, false, false, false];
     updateDisplay(commandMask, 'command-mask');
 }
+
+function exitGame() {
+    logGameStop(db, gameUUID);
+    addHighScore(db, gameUUID, player_id, score, time_interval, game_interval);
+
+    worker.postMessage({ command: 'stop' });
+    document.getElementById('game-end-message').innerText = `Thank you for playing! Score: ${score}`;
+    document.getElementById('game-end-popup').style.display = 'block';
+}
+
+// View
 
 function formatTime(seconds) {
     const minutes = Math.floor(seconds / 60);
@@ -106,40 +160,56 @@ function formatTime(seconds) {
     return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
 }
 
-function exitGame() {
-    worker.postMessage({ command: 'stop' });
-
-    document.getElementById('game-end-message').innerText = `Thank you for playing! Score: ${score}`;
-    document.getElementById('game-end-popup').style.display = 'block';
-}
-
 function closePopup() {
     document.getElementById('game-end-popup').style.display = 'none';
-    // Additional logic for closing the popup, such as resetting the game or navigating to another page
 }
 
+// Function to update the display of a state
+function updateDisplay(state, elementId) {
+    const element = document.getElementById(elementId);
+    element.innerHTML = '';
+    state.forEach(bit => {
+        const bitElement = document.createElement('span');
+        bitElement.className = 'bit' + (bit ? ' on' : '');
+        element.appendChild(bitElement);
+    });
+}
+
+
+// UI Handlers
+
 document.addEventListener('keydown', function(event) {
+    let index = -1
     switch(event.key) {
         case 'a':
         case 'A':
             updateCommand('A');
+            index = 0;
             break;
         case 's':
         case 'S':
             updateCommand('S');
+            index = 1;
             break;
         case 'd':
         case 'D':
             updateCommand('D');
+            index = 2;
             break;
         case 'f':
         case 'F':
             updateCommand('F');
+            index = 3;
             break;
         case ' ':
             applyCommand();
             break;
     }
+
+    if (index > 0) {
+        logKeyPress(db, gameUUID, k, index, currentState, targetState);
+    }
+
 });
 
 document.getElementById('game-settings-form').addEventListener('submit', function(event) {

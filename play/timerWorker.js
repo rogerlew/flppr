@@ -2,7 +2,7 @@ let interval;
 let trialStartTime; // Datetime
 let startTime;
 let time_interval;
-let game_timer;
+let game_interval;
 
 self.addEventListener('message', function(e) {
     const data = e.data;
@@ -12,9 +12,8 @@ self.addEventListener('message', function(e) {
             startTime = Date.now();
 			trialStartTime = startTime;
             time_interval = data.time_interval;
-            game_timer = data.game_timer;
+            game_interval = data.game_interval;
             startTimer();
-            break;
             break;
         case 'new_trial':
 			trialStartTime = Date.now();
@@ -31,7 +30,7 @@ function startTimer() {
         const elapsedTrialTime = Math.floor((currentTime - trialStartTime) / 1000);
         const remainingTrialTime = time_interval - elapsedTrialTime;
         const elapsedGameTime = Math.floor((currentTime - startTime) / 1000);
-        const remainingGameTime = game_timer - elapsedGameTime;
+        const remainingGameTime = game_interval - elapsedGameTime;
 
         // Post updates back to the main thread
         self.postMessage({ 
@@ -45,6 +44,10 @@ function startTimer() {
             // Logic for when the trial timer runs out
             // Reset trial timer
             trialStartTime = Date.now(); 
+            
+            self.postMessage({ 
+                type: 'trialTimeOut'
+            });
         }
 
         if (remainingGameTime <= 0) {

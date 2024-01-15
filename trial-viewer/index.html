@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flppr High Scores</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #333333;
+            color: #00ff00;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        .table-dark {
+            background-color: #1a1a1a;
+        }
+
+        .table-dark th, .table-dark td {
+            border-color: #00ff00;
+        }
+
+        .table-dark thead th {
+            color: white;
+        }
+        .textlabels {
+            fill: white; /* Sets the font color to white */
+        }
+
+        .timeline-xAxis {
+            color: white;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="text-center">flppr trial viewer</h1>
+
+        <button onclick='downloadZip(keypress_data, score_data, trialReset_data, execute_data);'>Download Data</button>
+        <br/>
+
+        <div id="execute_timeline"></div>
+
+    </div>
+    
+<script src="https://code.jquery.com/jquery-latest.min.js"></script>
+<script src="https://d3js.org/d3.v4.min.js" charset="utf-8"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-timelines@1.3.1/build/d3-timelines.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/filesaver.js-npm@1.0.1/FileSaver.min.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script>
+    
+// Your web app's Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyBGh3iTmoiYh2jhbYyyg9G9z_3DpNqidQw",
+    authDomain: "flppr-a270b.firebaseapp.com",
+    projectId: "flppr-a270b",
+    storageBucket: "flppr-a270b.appspot.com",
+    messagingSenderId: "203747411489",
+    appId: "1:203747411489:web:4991fd457ee707e0a1c560"
+    };
+
+// Initialize Firebase
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+auth.signInAnonymously()
+  .then(() => {
+    console.log("Signed in anonymously");
+  })
+  .catch((error) => {
+    const errorCode = error.code;
+    const errorMessage = error.message;
+    console.log("Error signing in anonymously:", errorCode, errorMessage);
+  });
+
+  function getQueryParam(param) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param);
+}
+
+const gameUUID = getQueryParam("gameUUID"); // Get 'gameUUID' from the URL
+
+console.log(gameUUID);
+
+async function exportEvents(db, gameUUID, eventType) {
+    try {
+        const eventsRef = db.collection("Games").doc(gameUUID).collection("Events");
+        const querySnapshot = await eventsRef.where("eventType", "==", eventType).get();
+        
+        let events = [];
+        querySnapshot.forEach(doc => {
+            let eventData = doc.data();
+            let obj = Object.assign(Object.create(null), eventData.details);
+            obj.timestamp = eventData.timestamp.seconds + eventData.timestamp.nanoseconds / 1e9;
+            events.push(obj);
+        });
+        events.sort((a, b) => a.timestamp - b.timestamp);
+        
+        return events;
+    } catch (error) {
+        console.error("Error fetching events:", error);
+        return []; // Return an empty array in case of error
+    }
+}
+
+
+let keypress_data;
+let trialReset_data;
+let execute_data
+let score_data;
+
+let keypressPromise = exportEvents(db, gameUUID, "keypress");
+let trialResetPromise = exportEvents(db, gameUUID, "trialReset");
+let executePromise = exportEvents(db, gameUUID, "execute");
+let scorePromise = exportEvents(db, gameUUID, "score");
+
+Promise.all([keypressPromise, trialResetPromise, executePromise, scorePromise]).then(values => {
+    [keypress_data, trialReset_data, execute_data, score_data] = values;
+    
+    // build error_data array for timeline
+    var times = [];
+    for (var i = 0; i < execute_data.length; i++) {
+        if (execute_data[i].hit === 1) {
+            times.push({
+                "color":"#e83e8c",
+                "starting_time": execute_data[i].timestamp,
+                "ending_time": execute_data[i].timestamp + 0.1
+            });
+        }
+    }
+
+    var error_data = [
+        {
+            "label": "Error",
+            "times": times
+        }
+    ];
+
+    // create timeline with d3-timelines
+    var chart = d3.timelines();
+
+    var svg = d3.select("#execute_timeline").append("svg").attr("width", "100%")
+                .datum(error_data).call(chart);
+    d3.selectAll(".timeline-label").style("fill", "white");
+    d3.selectAll("g.timeline-xAxis > path").style("stroke", "white");
+
+}).catch(error => {
+    console.error("Error loading data:", error);
+});
+
+function eventsToCsvContent(eventsData, eventType) {
+    let csvContent = "";
+
+    // Check if eventsData is not empty and has data
+    if (eventsData.length > 0) {
+        // Header row
+        const headers = Object.keys(eventsData[0]);
+        csvContent += headers.join(",") + "\n";
+
+        // Data rows
+        eventsData.forEach(event => {
+            const row = headers.map(header => {
+                const value = event[header];
+
+                if (header == "timestamp") {
+                    return new Date(value * 1000).toISOString();
+                }
+                else {
+                    return JSON.stringify(value);
+                }
+            }).join(",");
+            csvContent += row + "\n";
+        });
+    }
+
+    return csvContent;
+}
+
+function downloadZip(keypress_data, score_data, trialReset_data, execute_data) {
+    
+    var keypress_csv =eventsToCsvContent(keypress_data, "keypress");
+    var score_csv =eventsToCsvContent(score_data, "score");
+    var trialReset_csv =eventsToCsvContent(trialReset_data, "trialReset");
+    var execute_csv = eventsToCsvContent(execute_data, "execute");
+    
+    const zip = new JSZip();
+    zip.file("keypress.csv", keypress_csv);
+    zip.file("score.csv", score_csv);
+    zip.file("trialReset.csv", trialReset_csv);
+    zip.file("execute.csv", execute_csv);
+
+    zip.generateAsync({type:"blob"})
+    .then(function(content) {
+        // see FileSaver.js
+        saveAs(content, `${gameUUID}.zip`);
+    });
+}
+
+</script>
+</body>
+</html>
